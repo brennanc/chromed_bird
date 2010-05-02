@@ -12,6 +12,7 @@ var MAX_TWEET_SIZE = 140;
 var Persistence = chrome.extension.getBackgroundPage().Persistence;
 var urlExpander = chrome.extension.getBackgroundPage().urlExpander;
 var tweetManager = chrome.extension.getBackgroundPage().TweetManager.instance;
+var pingFmManager = chrome.extension.getBackgroundPage().PingFmManager.instance;
 var twitterBackend = tweetManager.twitterBackend;
 var OptionsBackend = chrome.extension.getBackgroundPage().OptionsBackend;
 var TimelineTemplate = chrome.extension.getBackgroundPage().TimelineTemplate;
@@ -38,6 +39,7 @@ if(!twitterBackend.authenticated() && !twitterBackend.tokenRequested()) {
   twitterBackend.startAuthentication();
   window.close();
 }
+
 </script>
 
 <script type="text/javascript" src="lib/3rdparty/jquery.js"></script>
@@ -46,9 +48,10 @@ if(!twitterBackend.authenticated() && !twitterBackend.tokenRequested()) {
 <script type="text/javascript" src="lib/3rdparty/jquery.contextMenu.js"></script>
 
 <!--script type="text/javascript" src="lib/debug.js"></script-->
+<script type="text/javascript" src="lib/pingfm_lib.js"></script>
 <script type="text/javascript" src="lib/shortener_lib.js"></script>
 <script type="text/javascript" src="lib/simple_select.js"></script>
-<script>
+<script type="text/javascript">
 
 var shortener_acct = OptionsBackend.get('shortener_acct');
 var shortener_login = null;
@@ -61,6 +64,7 @@ var reply_all = OptionsBackend.get('reply_all');
 var shortener = new Shortener(OptionsBackend.get('url_shortener'),
   shortener_acct, shortener_login, shortener_key);
 
+var usingPingFm = OptionsBackend.get('use_pingfm');
 $.extend($.ui.tabs.prototype, {
   refreshPositions: function() {
     return this._tabify();
@@ -241,6 +245,17 @@ var ThemeManager = {
   }
 }
 
+var PingFm = {
+    onPingfmValidationComplete: function(success, data, status) {
+        debug("success="+success);
+    },
+
+    testmypingfmgo: function(msg) {
+        var pingfm = new PingfmLib("6160a8c2b019a8a6ff5956bbd4f295fa-1272745138");
+        pingfm.post(PingFm.onPingfmValidationComplete, $("#compose_tweet_area textarea").val());
+    }
+}
+
 var Composer = {
   replyId: null,
   replyUser: null,
@@ -369,6 +384,7 @@ var Composer = {
   reply: function (node) {
     Composer.showComposeArea(true);
 
+    $("#usepingfm").attr("checked", false);
     var textArea = $("#compose_tweet_area textarea");
     var user = $(".user", node).attr('screen_name');
     var timelineId = $(node).attr('timelineid');
@@ -466,27 +482,34 @@ var Composer = {
     $("#loading").show();
     $("#compose_tweet_area input[type='button']").attr("disabled", "disabled");
     $("#compose_tweet_area textarea").attr("disabled", "disabled");
-    tweetManager.postTweet(function(success, data, status) {
-      $("#loading").hide();
-      $("#compose_tweet_area input[type='button']").removeAttr("disabled");
-      $("#compose_tweet_area textarea").removeAttr("disabled");
-      if(success) {
-        var textArea = $("#compose_tweet_area textarea");
-        var msg = textArea.val();
-        Composer.replyId = null;
-        Composer.textareaChanged();
-        Composer.showComposeArea();
-        Shortener.clear();
+    var msg = $("#compose_tweet_area textarea").val();
+    var callback = function(success, data, status) {
+        $("#loading").hide();
+        $("#compose_tweet_area input[type='button']").removeAttr("disabled");
+        $("#compose_tweet_area textarea").removeAttr("disabled");
+        if(success) {
+            var textArea = $("#compose_tweet_area textarea");
+            var msg = textArea.val();
+            Composer.replyId = null;
+            Composer.textareaChanged();
+            Composer.showComposeArea();
+            Shortener.clear();
 
-        if(!msg.match(/^d\s\w*?\s/i)) {
-          loadTimeline(true, "home");
+            if(!msg.match(/^d\s\w*?\s/i)) {
+            loadTimeline(true, "home");
+            }
+            textArea.val("");
+        } else {
+            $("#compose_tweet_area textarea").focus();
+            Renderer.showError('Unexpected error ' + status + ' sending tweet.', 'Composer.sendTweet');
         }
-        textArea.val("");
-      } else {
-        $("#compose_tweet_area textarea").focus();
-        Renderer.showError('Unexpected error ' + status + ' sending tweet.', 'Composer.sendTweet');
-      }
-    }, $("#compose_tweet_area textarea").val(), Composer.replyId);
+    }
+
+    if ($("#usepingfm").attr("checked")) {
+        pingFmManager.post(callback, msg);
+    } else {
+        tweetManager.postTweet(callback, msg, Composer.replyId);
+    }
   },
 
   refreshNew: function() {
@@ -1465,6 +1488,12 @@ function initializeWorkspace() {
     var composeButton = $("#compose_tweet").remove();
     $("#workspace").append(composeArea).append(composeButton);
   }
+  if(OptionsBackend.get('use_pingfm') == true) {
+    $("#pingfmtoggle").show();
+    $("#usepingfm").attr("checked", true);
+  } else {
+    $("#pingfmtoggle").hide();
+  }
 
   //Delay loading, improving responsiveness
   setTimeout(function() {
@@ -1533,6 +1562,7 @@ $(function() {
     </div>
     <div class="footer">
       <input type="button" value="Tweet it!" onclick="Composer.sendTweet();"/>
+      <span id="pingfmtoggle">w/ping.fm<input type="checkbox" name="usepingfm" id="usepingfm"/></span>
       <span class="chars_left"></span>
     </div>
   </div>

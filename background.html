@@ -8,6 +8,7 @@
 <script type="text/javascript" src="lib/math_utils.js"></script>
 <script type="text/javascript" src="lib/persistence.js"></script>
 <script type="text/javascript" src="lib/twitter_lib.js"></script>
+<script type="text/javascript" src="lib/pingfm_lib.js"></script>
 <script type="text/javascript" src="lib/icon_creator.js"></script>
 <script type="text/javascript" src="lib/expander_lib.js"></script>
 
@@ -26,7 +27,7 @@
 <script type="text/javascript" src="lib/timelines/search_timeline.js"></script>
 
 
-<script>
+<script type="text/javascript">
 urlExpander = new Expander();
 
 function ComposerData() {
@@ -732,11 +733,13 @@ TweetManager.prototype = {
     this.oauthTokenData.remove();
     this.stopAll();
     TweetManager.instance = new TweetManager();
+    PingFmManager.instance = new PingFmManager();
   },
 
   restart: function() {
     this.stopAll();
     TweetManager.instance = new TweetManager();
+    PingFmManager.instance = new PingFmManager();
   },
 
   markTimelineAsRead: function() {
@@ -796,6 +799,18 @@ TweetManager.prototype = {
       }
     }
   }
+}
+
+function PingFmManager() {
+    this.usingPingFm = OptionsBackend.get('use_pingfm');
+    this.userAppKey = OptionsBackend.get('pingfm_userappkey');
+    this.pingfmBackend = new PingfmLib(this.userAppKey);
+}
+
+PingFmManager.prototype = {
+    post : function(callback, msg) {
+        this.pingfmBackend.post(callback, msg);
+    }
 }
 
 /* Clean up old versions mess */
@@ -906,6 +921,7 @@ $.ajax({
 
 function initializeExtension() {
   TweetManager.instance = new TweetManager();
+  PingFmManager.instance = new PingFmManager();
 
   var waitingFirstRequest = true;
   var selectedResponse = null;

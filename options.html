@@ -20,6 +20,8 @@ var twitterBackend = tweetManager.twitterBackend;
 var options = new Options();
 var imgEl = null;
 
+
+
 function paintIcon(canvas, color) {
   if(!imgEl) {
     var img = $('<img>').attr('src', 'img/icon19.png');
@@ -75,6 +77,15 @@ $(function() {
   $("select[name='url_shortener']").change(onShortenerChange);
   $("input[name='shortener_acct']").click(onShortenerAcctClick);
 
+  var onUsePingFmClick = function() {
+      if ($("input[name='use_pingfm']").attr('checked')) {
+        $("#pingfm_userappkeysettings").slideDown('fast', null);
+      } else {
+        $("#pingfm_userappkeysettings").slideUp('fast', null);
+      }
+  }
+  $("input[name='use_pingfm']").click(onUsePingFmClick);
+
   var onSigningUrlCheck = function() {
     var $check = $("input[name='same_signing_urls']");
     if($check.attr('checked')) {
@@ -115,6 +126,7 @@ $(function() {
     onShortenerChange();
     onShortenerAcctClick();
     onSigningUrlCheck();
+    onUsePingFmClick();
   });
   options.onsaveChangedOption(function(optionName, oldValue, newValue) {
     var idx;
@@ -504,7 +516,13 @@ function updatePredictedHitsCount() {
   <fieldset>
     <legend>Microblogging Service</legend>
     <input type="radio" name="microblogging_service" value="twitter" id="service_twitter" must_restart> <label for="service_twitter" class="radio_opt">Twitter</label>
-    <input type="radio" name="microblogging_service" value="identica" id="service_identica" must_restart> <label for="service_identica" class="radio_opt">identi.ca</label>
+    <input type="radio" name="microblogging_service" value="identica" id="service_identica" must_restart> <label for="service_identica" class="radio_opt">identi.ca</label><br/><br/>
+    <label for="use_pingfm">Use Ping.fm for posting:</label>
+    <input type="checkbox" name="use_pingfm" validator="pingfmValidator" must_restart><br/>
+    <div id="pingfm_userappkeysettings">
+        <label for="pingfm_userappkey">Ping.fm user app key (ping.fm/key):</label>
+        <input type="text" name="pingfm_userappkey" id="pingfm_userappkey" must_restart><br/>
+    </div>
   </fieldset>
 
   <fieldset>
